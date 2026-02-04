@@ -80,7 +80,7 @@ def find_corefile_block(yaml_text: str) -> Tuple[int, int, str]:
         raise ValueError("Corefile block has no content")
 
     # Determine block content indent from first non-empty line after Corefile: |
-    content_indent: Optional[str] = None
+    content_indent: Optional[str] = ""
     for j in range(start, len(yaml_lines)):
         if yaml_lines[j].strip() == "":
             continue
@@ -131,14 +131,14 @@ def insert_hosts_into_corefile(corefile: str, ip: str, hostname: str) -> str:
         raise ValueError("Could not find closing '}' for '.:53 {' server block")
 
     # Determine indentation for plugins inside '.:53 { }'
-    plugin_indent = None
+    plugin_indent = ""
     depth = 0
     for k in range(start + 1, end + 1):
         ln: str = core_lines[k]
         if ln.strip() and not ln.strip().startswith("#"):
             plugin_indent = ln[: len(ln) - len(ln.lstrip(" "))]
             break
-    if plugin_indent is None:
+    if plugin_indent == "":
         # fallback: indent header + 4 spaces
         header_indent = core_lines[start][: len(core_lines[start]) - len(core_lines[start].lstrip(" "))]
         plugin_indent = header_indent + " " * 4
