@@ -1,0 +1,37 @@
+apiVersion: v1
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30 {
+           disable success cluster.local
+           disable denial cluster.local
+        }
+        loop
+        reload
+        loadbalance
+    }
+    # block to forward .consul queries to your Consul service
+    consul:53 {
+        forward . 10.96.19.42:8600
+    }
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2026-01-06T17:33:39Z"
+  name: coredns
+  namespace: kube-system
+  resourceVersion: "863"
+  uid: 65087509-4ac6-49dd-aff0-d6d126e21cbc

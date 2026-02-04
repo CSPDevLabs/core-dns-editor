@@ -1,0 +1,18 @@
+# Python virtual environment
+.venv/
+
+# pytest cache
+.pytest_cache/
+__pycache__/
+
+# pytest html report
+.pytest_html/
+
+# pytest coverage report
+.coverage
+
+# pytest coverage html report
+.coverage_html/
+
+# pytest log file
+pytest.log
