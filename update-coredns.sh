@@ -1,6 +1,5 @@
-#!/bin/sh
-set -o pipefail
-set -e
+#!/bin/bash
+set -euo pipefail
 
 KUBECTL_VERSION="${KUBECTL_VERSION:-v1.33.1}"
 
