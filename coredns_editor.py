@@ -50,7 +50,8 @@ logging.basicConfig(level=logging.DEBUG)
 #   namespace: kube-system
 #   resourceVersion: "863"
 #   uid: 65087509-4ac6-49dd-aff0-d6d126e21cbc
-  
+
+
 def find_corefile_block(yaml_text: str) -> Tuple[int, int, str]:
     """Locate the YAML block scalar for 'Corefile: |' and return it.
 
@@ -84,12 +85,14 @@ def find_corefile_block(yaml_text: str) -> Tuple[int, int, str]:
     for j in range(start, len(yaml_lines)):
         if yaml_lines[j].strip() == "":
             continue
-        content_indent = yaml_lines[j][: len(yaml_lines[j]) - len(yaml_lines[j].lstrip(" "))]
+        content_indent = yaml_lines[j][
+            : len(yaml_lines[j]) - len(yaml_lines[j].lstrip(" "))
+        ]
         log.debug(f"content_indent: `{content_indent}`")
         break
     if content_indent == "":
         raise ValueError(f"Could not determine Corefile block indentation")
-    
+
     # Block ends when indentation decreases (< content_indent) on a non-empty line§
     end: int = len(yaml_lines)
     for k in range(start, len(yaml_lines)):
@@ -104,9 +107,6 @@ def find_corefile_block(yaml_text: str) -> Tuple[int, int, str]:
 
 
 def insert_hosts_into_corefile(corefile: str, ip: str, hostname: str) -> str:
-    if hostname in corefile:
-        return corefile
-
     core_lines = corefile.splitlines()
     # Find '.:53 {' header
     start = None
@@ -140,9 +140,23 @@ def insert_hosts_into_corefile(corefile: str, ip: str, hostname: str) -> str:
             break
     if plugin_indent == "":
         # fallback: indent header + 4 spaces
-        header_indent = core_lines[start][: len(core_lines[start]) - len(core_lines[start].lstrip(" "))]
+        header_indent = core_lines[start][
+            : len(core_lines[start]) - len(core_lines[start].lstrip(" "))
+        ]
         plugin_indent = header_indent + " " * 4
     inner = plugin_indent + " " * 4
+
+    # Skip insertion if the hostname already appears inside a hosts block
+    in_hosts = False
+    for k in range(start + 1, end + 1):
+        s = core_lines[k].strip()
+        if s.startswith("hosts") and "{" in s:
+            in_hosts = True
+        if in_hosts:
+            if hostname in s:
+                return corefile
+            if s == "}":
+                in_hosts = False
 
     hosts_block = [
         f"{plugin_indent}hosts {{",
@@ -163,13 +177,17 @@ def insert_hosts_into_corefile(corefile: str, ip: str, hostname: str) -> str:
             if s == "ready":
                 insert_at = i + 1
                 break
-            if found_before is None and (s.startswith("kubernetes ") or s.startswith("forward ")):
+            if found_before is None and (
+                s.startswith("kubernetes ") or s.startswith("forward ")
+            ):
                 found_before = i
         else:
             if found_before is not None:
                 insert_at = found_before
 
-    new_core_lines: List[str] = core_lines[:insert_at] + hosts_block + core_lines[insert_at:]
+    new_core_lines: List[str] = (
+        core_lines[:insert_at] + hosts_block + core_lines[insert_at:]
+    )
     return "\n".join(new_core_lines) + ("\n" if corefile.endswith("\n") else "")
 
 
@@ -182,7 +200,6 @@ def main() -> int:
     ap.add_argument("-o", "--output", type=Path)
     args: argparse.Namespace = ap.parse_args()
 
-    
     yaml_text: str = args.input.read_text(encoding="utf-8")
     start, end, content_indent = find_corefile_block(yaml_text)
     lines: List[str] = yaml_text.splitlines(True)
@@ -191,11 +208,11 @@ def main() -> int:
     stripped: List[str] = []
     for ln in lines[start:end]:
         if ln.startswith(content_indent):
-            stripped.append(ln[len(content_indent):])
+            stripped.append(ln[len(content_indent) :])
         else:
             stripped.append(ln)
     corefile: str = "".join(stripped)
-    
+
     # pprint(corefile)
     # exit(0)
     out_contents: str = ""

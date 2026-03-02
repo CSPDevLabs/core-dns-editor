@@ -173,3 +173,73 @@ def test_main_in_place(tmp_path, monkeypatch):
     updated = input_path.read_text(encoding="utf-8")
     assert "hosts {" in updated
     assert "1.2.3.4 node.local" in updated
+
+
+def test_main_output_file(tmp_path, monkeypatch):
+    """Test that main writes to a separate output file with -o."""
+    input_path = tmp_path / "coredns.yaml"
+    output_path = tmp_path / "coredns_out.yaml"
+    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
+    argv = [
+        "coredns_editor.py",
+        str(input_path),
+        "--ip",
+        "1.2.3.4",
+        "--hostname",
+        "node.local",
+        "-o",
+        str(output_path),
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+    assert coredns_editor.main() == 0
+    assert input_path.read_text(encoding="utf-8") == EXAMPLE_YAML
+    out = output_path.read_text(encoding="utf-8")
+    assert "hosts {" in out
+    assert "1.2.3.4 node.local" in out
+
+
+def test_skip_insertion_when_hostname_exists_different_ip():
+    """Hostname already in a hosts block with a different IP — no new block added."""
+    corefile = _extract_corefile(EXAMPLE_YAML)
+    first = coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "node.local")
+    second = coredns_editor.insert_hosts_into_corefile(first, "5.6.7.8", "node.local")
+    assert second == first
+    assert second.count("hosts {") == 1
+
+
+def test_insert_new_hostname_when_different_host_exists():
+    """Different hostname should get a new hosts block even if one already exists."""
+    corefile = _extract_corefile(EXAMPLE_YAML)
+    first = coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "node.local")
+    second = coredns_editor.insert_hosts_into_corefile(first, "5.6.7.8", "other.local")
+    assert "1.2.3.4 node.local" in second
+    assert "5.6.7.8 other.local" in second
+
+
+def test_insert_hosts_before_kubernetes_when_no_ready():
+    """Without a 'ready' plugin, hosts block goes before 'kubernetes'."""
+    corefile = """\
+.:53 {
+    errors
+    kubernetes cluster.local in-addr.arpa ip6.arpa {
+       pods insecure
+       fallthrough in-addr.arpa ip6.arpa
+       ttl 30
+    }
+    forward . /etc/resolv.conf {
+       max_concurrent 1000
+    }
+}
+"""
+    updated = coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "node.local")
+    lines = updated.splitlines()
+    hosts_idx = lines.index("    hosts {")
+    kube_idx = next(i for i, ln in enumerate(lines) if ln.strip().startswith("kubernetes "))
+    assert hosts_idx < kube_idx
+
+
+def test_insert_hosts_unclosed_server_block():
+    """Unclosed '.:53 {' should raise ValueError."""
+    corefile = ".:53 {\n    errors\n"
+    with pytest.raises(ValueError, match="closing '}'"):
+        coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "node.local")

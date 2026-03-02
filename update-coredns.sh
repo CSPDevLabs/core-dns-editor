@@ -8,6 +8,8 @@ KUBECTL_VERSION="${KUBECTL_VERSION:-v1.33.1}"
 curl -L -o ./kubectl https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
 chmod +x ./kubectl
 
+# install python dependencies
+pip install -r "${SCRIPT_DIR:-/opt/scripts}/requirements.txt"
 
 INGRESS_NS="${INGRESS_NS:-nok-bng}"
 INGRESS_SVC="${INGRESS_SVC:-nok-apps-ingress}"
