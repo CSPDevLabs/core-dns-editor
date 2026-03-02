@@ -10,14 +10,14 @@ cd "$SCRIPT_DIR"
 
 echo "Installing kubectl ${KUBECTL_VERSION}"
 curl -L -o ./kubectl https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
-chmod +x ./kubectl
+chmod +x ${SCRIPT_DIR}/kubectl
 
 # install python dependencies
 pip install -r "${SCRIPT_DIR}/requirements.txt"
 
 # get external IP or hostname of ingress controller
-IP=$(kubectl -n $INGRESS_NS get ingress $INGRESS_SVC -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-FQDN=$(kubectl -n $INGRESS_NS get ingress $INGRESS_SVC -o jsonpath='{.spec.rules[0].host}')
+IP=$(${SCRIPT_DIR}/kubectl -n $INGRESS_NS get ingress $INGRESS_SVC -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+FQDN=$(${SCRIPT_DIR}/kubectl -n $INGRESS_NS get ingress $INGRESS_SVC -o jsonpath='{.spec.rules[0].host}')
 
 if [ -z "$IP" ] && [ -z "$FQDN" ]; then
   echo "ERROR: ingress controller has no external IP/hostname"
