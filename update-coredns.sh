@@ -8,12 +8,13 @@ KUBECTL_VERSION="${KUBECTL_VERSION:-v1.33.1}"
 curl -L -o ./kubectl https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
 chmod +x ./kubectl
 
-# install python dependencies
-pip install -r "${SCRIPT_DIR:-/opt/scripts}/requirements.txt"
 
 INGRESS_NS="${INGRESS_NS:-nok-bng}"
 INGRESS_SVC="${INGRESS_SVC:-nok-apps-ingress}"
-SCRIPT_DIR="${SCRIPT_DIR:-/opt/scripts}"
+SCRIPT_DIR="${SCRIPT_DIR:-/opt/scripts/core-dns-editor}"
+
+# install python dependencies
+pip install -r "${SCRIPT_DIR}/requirements.txt"
 
 # get external IP or hostname of ingress controller
 IP=$(kubectl -n $INGRESS_NS get ingress $INGRESS_SVC -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
