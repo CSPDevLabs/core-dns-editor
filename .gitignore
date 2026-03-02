@@ -16,3 +16,6 @@ __pycache__/
 
 # pytest log file
 pytest.log
+
+# kubectl
+kubectl
