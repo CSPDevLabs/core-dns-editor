@@ -5,6 +5,7 @@ KUBECTL_VERSION="${KUBECTL_VERSION:-v1.33.1}"
 INGRESS_NS="${INGRESS_NS:-nok-bng}"
 INGRESS_SVC="${INGRESS_SVC:-nok-apps-ingress}"
 SCRIPT_DIR="${SCRIPT_DIR:-/core-dns-editor}"
+CORE_DNS_CONFIG="${CORE_DNS_CONFIG:-/tmp/coredns.yaml}"
 
 cd "$SCRIPT_DIR"
 
@@ -28,7 +29,7 @@ TARGET="$IP"
 if [ -z "$TARGET" ]; then TARGET="$FQDN"; fi
 
 # get Corefile, patch in hosts entry
-${SCRIPT_DIR}/kubectl -n kube-system get cm coredns -o yaml > /tmp/coredns.yaml
-python3 "$SCRIPT_DIR/coredns_editor.py" /tmp/coredns.yaml --ip $IP --hostname $FQDN -i
-${SCRIPT_DIR}/kubectl -n kube-system replace cm coredns -f  /tmp/coredns.yaml
+${SCRIPT_DIR}/kubectl -n kube-system get cm coredns -o yaml > ${CORE_DNS_CONFIG}
+python3 ${SCRIPT_DIR}/coredns_editor.py ${CORE_DNS_CONFIG} --ip $IP --hostname $FQDN -i
+${SCRIPT_DIR}/kubectl -n kube-system replace cm coredns -f  ${CORE_DNS_CONFIG}
 ${SCRIPT_DIR}/kubectl -n kube-system rollout restart deployment/coredns
