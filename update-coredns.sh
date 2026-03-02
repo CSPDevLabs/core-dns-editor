@@ -2,15 +2,16 @@
 set -euo pipefail
 
 KUBECTL_VERSION="${KUBECTL_VERSION:-v1.33.1}"
+INGRESS_NS="${INGRESS_NS:-nok-bng}"
+INGRESS_SVC="${INGRESS_SVC:-nok-apps-ingress}"
+SCRIPT_DIR="${SCRIPT_DIR:-/update-coredns/core-dns-editor}"
 
+cd "$SCRIPT_DIR"
 # install kubectl
 curl -L -o ./kubectl https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
 chmod +x ./kubectl
 
 
-INGRESS_NS="${INGRESS_NS:-nok-bng}"
-INGRESS_SVC="${INGRESS_SVC:-nok-apps-ingress}"
-SCRIPT_DIR="${SCRIPT_DIR:-/opt/scripts/core-dns-editor}"
 
 # install python dependencies
 pip install -r "${SCRIPT_DIR}/requirements.txt"
