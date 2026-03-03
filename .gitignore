@@ -19,3 +19,6 @@ pytest.log
 
 # kubectl
 kubectl
+
+# vscode
+*.code-workspace
