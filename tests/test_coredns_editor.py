@@ -243,3 +243,260 @@ def test_insert_hosts_unclosed_server_block():
     corefile = ".:53 {\n    errors\n"
     with pytest.raises(ValueError, match="closing '}'"):
         coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "node.local")
+
+
+def test_multiple_hosts_insertions():
+    corefile = _extract_corefile(EXAMPLE_YAML)
+    updated = coredns_editor.insert_hosts_into_corefile(corefile, "1.1.1.1", "a.local")
+    updated = coredns_editor.insert_hosts_into_corefile(updated, "2.2.2.2", "b.local")
+    updated = coredns_editor.insert_hosts_into_corefile(updated, "3.3.3.3", "c.local")
+    assert "1.1.1.1 a.local" in updated
+    assert "2.2.2.2 b.local" in updated
+    assert "3.3.3.3 c.local" in updated
+    assert updated.count("hosts {") == 3
+
+
+def test_same_hostname_different_ips_only_once():
+    corefile = _extract_corefile(EXAMPLE_YAML)
+    first = coredns_editor.insert_hosts_into_corefile(corefile, "1.1.1.1", "same.local")
+    second = coredns_editor.insert_hosts_into_corefile(first, "2.2.2.2", "same.local")
+    assert second == first
+    assert second.count("same.local") == 1
+
+
+def test_empty_corefile():
+    with pytest.raises(ValueError):
+        coredns_editor.insert_hosts_into_corefile("", "1.2.3.4", "node.local")
+
+
+def test_fallback_indent_logic():
+    corefile = """.:53 {
+}
+"""
+    updated = coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "node.local")
+    assert "hosts {" in updated
+    assert "1.2.3.4 node.local" in updated
+
+
+def test_corefile_without_trailing_newline():
+    corefile = """.:53 {
+    ready
+}"""
+
+    updated = coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "node.local")
+    assert updated.endswith("}") or updated.endswith("\n")
+
+
+def test_existing_hosts_block_with_other_entries():
+    corefile = """.:53 {
+    ready
+    hosts {
+        9.9.9.9 existing.local
+        fallthrough
+    }
+}
+"""
+    updated = coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "new.local")
+    assert "new.local" in updated
+    assert "existing.local" in updated
+
+
+
+def test_corefile_block_indent_drop_early():
+    yaml_text = """apiVersion: v1
+data:
+  Corefile: |
+    .:53 {
+        errors
+    }
+  something_else: value
+"""
+
+    start, end, indent = coredns_editor.find_corefile_block(yaml_text)
+
+    assert start < end
+
+
+
+def test_plugin_indent_empty_block():
+    corefile = """.:53 {
+# only comment
+}
+"""
+
+    updated = coredns_editor.insert_hosts_into_corefile(corefile, "1.2.3.4", "node.local")
+
+    assert "hosts {" in updated
+
+
+def test_main_output_file_branch(tmp_path, monkeypatch):
+    input_path = tmp_path / "coredns.yaml"
+    output_path = tmp_path / "out.yaml"
+
+    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
+
+    argv = [
+        "coredns_editor.py",
+        str(input_path),
+        "--ip", "1.2.3.4",
+        "--hostname", "node.local",
+        "-o", str(output_path),
+    ]
+
+    monkeypatch.setattr(sys, "argv", argv)
+
+    result = coredns_editor.main()
+
+    assert result == 0
+    assert output_path.exists()
+
+
+
+def test_main_print_branch(tmp_path, monkeypatch, capsys):
+    input_path = tmp_path / "coredns.yaml"
+    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
+
+    argv = [
+        "coredns_editor.py",
+        str(input_path),
+        "--ip", "1.2.3.4",
+        "--hostname", "node.local",
+    ]
+
+    monkeypatch.setattr(sys, "argv", argv)
+
+    coredns_editor.main()
+
+    captured = capsys.readouterr()
+
+    assert "hosts {" in captured.out
+
+
+
+def test_corefile_not_found_exact_branch():
+    yaml = """apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+"""
+    with pytest.raises(ValueError, match="Could not find 'Corefile: |'"):
+        coredns_editor.find_corefile_block(yaml)
+
+def test_corefile_indent_not_found_only_blank_lines():
+    yaml = """apiVersion: v1
+data:
+  Corefile: |
+    
+    
+"""
+    with pytest.raises(ValueError, match="Could not determine Corefile block indentation"):
+        coredns_editor.find_corefile_block(yaml)
+
+
+
+def test_main_no_change_branch(tmp_path, monkeypatch):
+    input_path = tmp_path / "coredns.yaml"
+    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
+
+    # First insert
+    argv1 = [
+        "coredns_editor.py",
+        str(input_path),
+        "--ip", "1.2.3.4",
+        "--hostname", "node.local",
+        "-i",
+    ]
+    monkeypatch.setattr(sys, "argv", argv1)
+    coredns_editor.main()
+
+    # Second run → should NOT modify
+    argv2 = [
+        "coredns_editor.py",
+        str(input_path),
+        "--ip", "1.2.3.4",
+        "--hostname", "node.local",
+    ]
+    monkeypatch.setattr(sys, "argv", argv2)
+    coredns_editor.main()
+
+    content = input_path.read_text()
+    assert content.count("hosts {") == 1
+
+
+
+def test_main_output_file_overwrite(tmp_path, monkeypatch):
+    input_path = tmp_path / "coredns.yaml"
+    output_path = tmp_path / "out.yaml"
+
+    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
+    output_path.write_text("OLD DATA", encoding="utf-8")
+
+    argv = [
+        "coredns_editor.py",
+        str(input_path),
+        "--ip", "1.2.3.4",
+        "--hostname", "node.local",
+        "-o", str(output_path),
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+
+    coredns_editor.main()
+
+    content = output_path.read_text()
+    assert "OLD DATA" not in content
+    assert "1.2.3.4 node.local" in content
+
+
+
+def test_main_print_stdout_branch(tmp_path, monkeypatch, capsys):
+    input_path = tmp_path / "coredns.yaml"
+    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
+
+    argv = [
+        "coredns_editor.py",
+        str(input_path),
+        "--ip", "8.8.8.8",
+        "--hostname", "dummy.local",
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+
+    coredns_editor.main()
+
+    out = capsys.readouterr().out
+    assert "8.8.8.8 dummy.local" in out
+
+
+def test_main_no_change_prints_original_yaml(tmp_path, monkeypatch, capsys):
+    """Covers:
+    - new_corefile == corefile
+    - print(out_contents)
+    """
+
+    # YAML that already has the hostname
+    yaml_with_host = """apiVersion: v1
+data:
+  Corefile: |
+    .:53 {
+        ready
+        hosts {
+            1.2.3.4 node.local
+            fallthrough
+        }
+    }
+"""
+
+    input_path = tmp_path / "coredns.yaml"
+    input_path.write_text(yaml_with_host, encoding="utf-8")
+
+    argv = [
+        "coredns_editor.py",
+        str(input_path),
+        "--ip", "1.2.3.4",
+        "--hostname", "node.local",
+    ]
+
+    monkeypatch.setattr(sys, "argv", argv)
+    coredns_editor.main()
+    out = capsys.readouterr().out
+    assert yaml_with_host in out
+    assert out.count("hosts {") == 1
