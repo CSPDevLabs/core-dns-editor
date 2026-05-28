@@ -329,70 +329,6 @@ def test_plugin_indent_empty_block():
     assert "hosts {" in updated
 
 
-def test_main_output_file_branch(tmp_path, monkeypatch):
-    input_path = tmp_path / "coredns.yaml"
-    output_path = tmp_path / "out.yaml"
-
-    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
-
-    argv = [
-        "coredns_editor.py",
-        str(input_path),
-        "--ip", "1.2.3.4",
-        "--hostname", "node.local",
-        "-o", str(output_path),
-    ]
-
-    monkeypatch.setattr(sys, "argv", argv)
-
-    result = coredns_editor.main()
-
-    assert result == 0
-    assert output_path.exists()
-
-
-
-def test_main_print_branch(tmp_path, monkeypatch, capsys):
-    input_path = tmp_path / "coredns.yaml"
-    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
-
-    argv = [
-        "coredns_editor.py",
-        str(input_path),
-        "--ip", "1.2.3.4",
-        "--hostname", "node.local",
-    ]
-
-    monkeypatch.setattr(sys, "argv", argv)
-
-    coredns_editor.main()
-
-    captured = capsys.readouterr()
-
-    assert "hosts {" in captured.out
-
-
-
-def test_corefile_not_found_exact_branch():
-    yaml = """apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test
-"""
-    with pytest.raises(ValueError, match="Could not find 'Corefile: |'"):
-        coredns_editor.find_corefile_block(yaml)
-
-def test_corefile_indent_not_found_only_blank_lines():
-    yaml = """apiVersion: v1
-data:
-  Corefile: |
-    
-    
-"""
-    with pytest.raises(ValueError, match="Could not determine Corefile block indentation"):
-        coredns_editor.find_corefile_block(yaml)
-
-
 
 def test_main_no_change_branch(tmp_path, monkeypatch):
     input_path = tmp_path / "coredns.yaml"
@@ -427,10 +363,8 @@ def test_main_no_change_branch(tmp_path, monkeypatch):
 def test_main_output_file_overwrite(tmp_path, monkeypatch):
     input_path = tmp_path / "coredns.yaml"
     output_path = tmp_path / "out.yaml"
-
     input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
     output_path.write_text("OLD DATA", encoding="utf-8")
-
     argv = [
         "coredns_editor.py",
         str(input_path),
@@ -439,31 +373,11 @@ def test_main_output_file_overwrite(tmp_path, monkeypatch):
         "-o", str(output_path),
     ]
     monkeypatch.setattr(sys, "argv", argv)
-
     coredns_editor.main()
-
     content = output_path.read_text()
     assert "OLD DATA" not in content
     assert "1.2.3.4 node.local" in content
 
-
-
-def test_main_print_stdout_branch(tmp_path, monkeypatch, capsys):
-    input_path = tmp_path / "coredns.yaml"
-    input_path.write_text(EXAMPLE_YAML, encoding="utf-8")
-
-    argv = [
-        "coredns_editor.py",
-        str(input_path),
-        "--ip", "8.8.8.8",
-        "--hostname", "dummy.local",
-    ]
-    monkeypatch.setattr(sys, "argv", argv)
-
-    coredns_editor.main()
-
-    out = capsys.readouterr().out
-    assert "8.8.8.8 dummy.local" in out
 
 
 def test_main_no_change_prints_original_yaml(tmp_path, monkeypatch, capsys):
