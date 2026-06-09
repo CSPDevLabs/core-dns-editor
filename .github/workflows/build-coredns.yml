@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - anushree-new-test
     tags:
       - 'v*'
 
