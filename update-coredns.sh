@@ -1,25 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-KUBECTL_VERSION="${KUBECTL_VERSION:-v1.33.1}"
 INGRESS_NS="${INGRESS_NS:-nok-bng}"
 INGRESS_SVC="${INGRESS_SVC:-nok-apps-ingress}"
 SCRIPT_DIR="${SCRIPT_DIR:-/core-dns-editor}"
 CORE_DNS_CONFIG="${CORE_DNS_CONFIG:-/tmp/coredns.yaml}"
 
-cd "$SCRIPT_DIR" # full path to script directory
-
+cd "$SCRIPT_DIR"
 KUBECTL_BIN="${SCRIPT_DIR}/kubectl"
-if [ -x "$KUBECTL_BIN" ]; then
-  echo "kubectl already exists at $KUBECTL_BIN, skipping download"
-else
-  echo "Installing kubectl ${KUBECTL_VERSION}"
-  curl -L -o ./kubectl https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
-  chmod +x "$KUBECTL_BIN"
-fi
-
-# install python dependencies
-pip install -r "${SCRIPT_DIR}/requirements.txt"
 
 # get external IP or hostname of ingress controller
 IP=$($KUBECTL_BIN -n $INGRESS_NS get ingress $INGRESS_SVC -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
